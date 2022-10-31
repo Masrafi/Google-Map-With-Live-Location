@@ -1,15 +1,35 @@
 import 'package:flutter/material.dart';
-
-import 'oder_tracking_page.dart';
+import 'package:googlemapdemo/tracking_screen.dart';
+import 'package:location/location.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
-  // This widget is the root of your application.
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  Location location = Location();
+  LocationData? currentLocation;
+  void getCurrentLocation() {
+    //location.enableBackgroundMode(enable: true);
+
+    location.getLocation().then((location) {
+      setState(() {
+        currentLocation = location;
+        // sourceLocation =
+        //     LatLng(currentLocation!.latitude!, currentLocation!.longitude!);
+        // destination =
+        //     LatLng(currentLocation!.latitude!, currentLocation!.longitude!);
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -27,7 +47,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       debugShowCheckedModeBanner: false,
-      home: const OrderTrackingPage(),
+      home: const TrackingScreen(),
     );
   }
 }

@@ -7,30 +7,47 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:googlemapdemo/constrant.dart';
 import 'package:location/location.dart';
 
-class OrderTrackingPage extends StatefulWidget {
-  const OrderTrackingPage({Key? key}) : super(key: key);
+class TrackingScreen extends StatefulWidget {
+  const TrackingScreen({Key? key}) : super(key: key);
 
   @override
-  State<OrderTrackingPage> createState() => _OrderTrackingPageState();
+  State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _OrderTrackingPageState extends State<OrderTrackingPage> {
+class _TrackingScreenState extends State<TrackingScreen> {
   final Completer<GoogleMapController> _controller = Completer();
-  static const LatLng sourceLocation = LatLng(23.847879799999998, 90.2575646);
-  static const LatLng destination = LatLng(23.7932126, 90.2713349);
-  late double flat, flon, lLat, lLon;
+  LatLng sourceLocation = LatLng(23.847879799999998, 90.2575646);
+  LatLng destination = LatLng(23.7932126, 90.2713349);
+  final TextEditingController _source = TextEditingController();
+  final TextEditingController _destination = TextEditingController();
   List<LatLng> polylineCoordinates = [];
-
+  // BitmapDescriptor sourceIcon = BitmapDescriptor.defaultMarker;
+  // BitmapDescriptor destinationIcon = BitmapDescriptor.defaultMarker;
+  // BitmapDescriptor currentLocationIcon = BitmapDescriptor.defaultMarker; //this is for set icon
+  bool isBool =
+      false; //This bool for when user enter 1st time, he is not set ani place. that's time it is false. After set place it is true
   //get current location
   Location location = Location();
+
   LocationData? currentLocation;
-  void getCurrentLocation() {
+  void getCurrentLocation() async {
     //location.enableBackgroundMode(enable: true);
     location.getLocation().then((location) {
       setState(() {
         currentLocation = location;
-        print("This is my current location: $currentLocation");
+        sourceLocation = LatLng(location!.latitude!, location!.longitude!);
+        destination = LatLng(location!.latitude!, location!.longitude!);
       });
+    });
+    GoogleMapController googleMapController = await _controller.future;
+    location.onLocationChanged.listen((newLoc) {
+      //change camera position according to the camera position change
+      currentLocation = newLoc;
+      googleMapController.animateCamera(CameraUpdate.newCameraPosition(
+          CameraPosition(
+              zoom: 13.5,
+              target: LatLng(newLoc!.latitude!, newLoc!.longitude!))));
+      setState(() {});
     });
   }
 
@@ -60,25 +77,47 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
     // TODO: implement initState
     getCurrentLocation();
     getPolyPoints();
-
+    //setCustomMarkerIcon();
     super.initState();
   }
 
+  // void setCustomMarkerIcon() async {    //this method works to set source, destination & current position icon
+  //   BitmapDescriptor.fromAssetImage(
+  //           ImageConfiguration.empty, "assets/Pin_source.png",)
+  //       .then((icon) {
+  //     sourceIcon = icon;
+  //   });
+  //   BitmapDescriptor.fromAssetImage(
+  //           ImageConfiguration.empty, "assets/Pin_destination.png")
+  //       .then((icon) {
+  //     destinationIcon = icon;
+  //   });
+  //   BitmapDescriptor.fromAssetImage(
+  //           ImageConfiguration.empty, "assets/Badge.png")
+  //       .then((icon) {
+  //     currentLocationIcon = icon;
+  //   });
+  // }
+
   @override
   Widget build(BuildContext context) {
-    //getCurrentLocation();
     return Scaffold(
         appBar: AppBar(),
         body: currentLocation == null
             ? Center(child: Text("Loading"))
             : GoogleMap(
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
+                //tiltGesturesEnabled: true,
                 initialCameraPosition: CameraPosition(
                   target: sourceLocation,
-                  // target: LatLng(
+
+                  // target: LatLng(   //target identify your starting point. it is for current location
                   //     currentLocation!.latitude!, currentLocation!.longitude!),
                   zoom: 13.5,
                 ),
                 polylines: {
+                  //it is for polyline on your source to destination
                   Polyline(
                     polylineId: PolylineId("route"),
                     points: polylineCoordinates,
@@ -87,18 +126,27 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                   )
                 },
                 markers: {
+                  //Source mean where you from. starting point
                   Marker(
+                    //icon: sourceIcon,
                     markerId: MarkerId("source"),
                     position: sourceLocation,
                   ),
-                  // Marker(
-                  //     markerId: MarkerId("source"),
-                  //     position: LatLng(currentLocation!.latitude!,
-                  //         currentLocation!.longitude!)),
                   Marker(
+                      //icon: currentLocationIcon,
+                      markerId: MarkerId("currentLocation"),
+                      position: LatLng(currentLocation!.latitude!,
+                          currentLocation!.longitude!)),
+                  Marker(
+                    //destination point
+                    //icon: destinationIcon,
                     markerId: MarkerId("destination"),
                     position: destination,
                   )
+                },
+                onMapCreated: (mapController) {
+                  //change map camera position according to the location change
+                  _controller.complete(mapController);
                 },
               ),
         floatingActionButton: FloatingActionButton(
@@ -107,9 +155,6 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat);
   }
-
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
 
   Future<void> _create() async {
     await showModalBottomSheet(
@@ -127,13 +172,13 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
-                  controller: _nameController,
+                  controller: _source,
                   decoration: const InputDecoration(labelText: 'Your Location'),
                 ),
                 TextField(
                   // keyboardType:
                   //     const TextInputType.text,
-                  controller: _priceController,
+                  controller: _destination,
                   decoration: const InputDecoration(
                     labelText: 'Destination',
                   ),
@@ -145,8 +190,19 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                   child: ElevatedButton(
                     child: const Text('Create'),
                     onPressed: () async {
-                      from();
-                      to();
+                      List<lo.Location> locations1 =
+                          await lo.locationFromAddress(_source.text);
+                      List<lo.Location> locations2 =
+                          await lo.locationFromAddress(_destination.text);
+                      setState(() {
+                        sourceLocation = LatLng(
+                            locations1[0].latitude, locations1[0].longitude);
+                        destination = LatLng(
+                            locations2[0].latitude, locations2[0].longitude);
+                        isBool = true; //After set place. it is true
+                      });
+                      _source.clear();
+                      _destination.clear();
                       Navigator.of(context).pop();
                     },
                   ),
@@ -155,27 +211,5 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
             ),
           );
         });
-  }
-
-  from() async {
-    List<lo.Location> locations =
-        await lo.locationFromAddress(_nameController.text);
-    flat = locations[0].latitude;
-    flon = locations[0].longitude;
-    print('this is one: ${locations[0].latitude}');
-    print('this is one: ${locations[0].longitude}');
-    // print('this is two: ${locations[1].latitude}');
-    // print('this is two: ${locations[1].longitude}');
-  }
-
-  to() async {
-    List<lo.Location> locations =
-        await lo.locationFromAddress(_priceController.text);
-    lLat = locations[0].latitude;
-    lLon = locations[0].longitude;
-    print('this is one: ${locations[0].latitude}');
-    print('this is one: ${locations[0].longitude}');
-    // print('this is two: ${locations[1].latitude}');
-    // print('this is two: ${locations[1].longitude}');
   }
 }
